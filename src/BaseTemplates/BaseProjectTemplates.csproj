@@ -17,7 +17,6 @@
     <ResourcesPath>..\Resources\</ResourcesPath>
   </PropertyGroup>
   <UsingTask TaskName="Microsoft.Web.MsBuildTasks.GetVSTemplateItems" AssemblyFile="$(TemplatesTools)\Microsoft.Web.MsBuildTasks2.dll" />
-  <UsingTask TaskName="Microsoft.Web.MsBuildTasks.RegexReplace" AssemblyFile="$(TemplatesTools)\Microsoft.Web.MsBuildTasks.dll"  />
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' " />
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' " />
   <ItemDefinitionGroup>
@@ -30,7 +29,7 @@
   <ItemGroup>
     <VSTemplate Include="ClassLibrary.vstemplate">
       <TargetName>$(ClassLibraryTemplateName)</TargetName>
-      <SearchPath>ClassLibrary\;$(ResourcesPath)</SearchPath>
+      <SearchPath>ClassLibrary\;$(ResourcesPath);Common\</SearchPath>
     </VSTemplate>
     <VSTemplate Include="DNXClassLibrary.vstemplate">
       <TargetName>DNXClassLibrary</TargetName>
@@ -38,7 +37,7 @@
     </VSTemplate>
     <VSTemplate Include="ConsoleApp.vstemplate">
       <TargetName>$(ConsoleAppTemplateName)</TargetName>
-      <SearchPath>ConsoleApp\;$(ResourcesPath)</SearchPath>
+      <SearchPath>ConsoleApp\;$(ResourcesPath);Common\</SearchPath>
     </VSTemplate>
     <VSTemplate Include="DNXConsoleApp.vstemplate">
       <TargetName>DNXConsoleApp</TargetName>
@@ -46,18 +45,18 @@
     </VSTemplate>
     <VSTemplate Include="EmptyWeb.vstemplate">
       <TargetName>$(EmptyWebTemplateName)</TargetName>
-      <SearchPath>EmptyWeb\;$(ResourcesPath)</SearchPath>
+      <SearchPath>EmptyWeb\;$(ResourcesPath);Common\</SearchPath>
     </VSTemplate>
     <VSTemplate Include="StarterWeb.vstemplate">
       <TargetName>$(StarterWebTemplateName)</TargetName>
-      <SearchPath>StarterWeb\;$(ResourcesPath)</SearchPath>
+      <SearchPath>StarterWeb\;$(ResourcesPath);Common\</SearchPath>
     </VSTemplate>
     <VSTemplate Include="WebAPI.vstemplate">
       <TargetName>$(WebAPITemplateName)</TargetName>
-      <SearchPath>WebAPI\;$(ResourcesPath)</SearchPath>
+      <SearchPath>WebAPI\;$(ResourcesPath);Common\</SearchPath>
     </VSTemplate>
   </ItemGroup>
-  <Target Name="BuildAllTemplates" DependsOnTargets="GetTemplateItemsFromVSTemplates" Inputs="@(VSTemplateItem)" Outputs="$(TemplatesOutputPath)%(TargetName).zip">
+  <Target Name="BuildAllTemplates" DependsOnTargets="SetupPackageSource;GetTemplateItemsFromVSTemplates" Inputs="@(VSTemplateItem)" Outputs="$(TemplatesOutputPath)%(TargetName).zip">
     <PropertyGroup>
       <TargetName>%(VSTemplateItem.TargetName)</TargetName>
       <TempPath>$(IntermediateOutputPath)$(TargetName)\</TempPath>
@@ -77,13 +76,13 @@
       <FilesToReplace Include="@(CopiedVsTemplateFiles)" />
     </ItemGroup>
 
-    <RegexReplace Files="@(FilesToReplace)" Find="__VSVER__" Condition="('%(Extension)' == '.vstemplate')" Replace="$(TemplatesTargetVersion)" />
+    <RegexReplace Files="@(FilesToReplace)" Find="__VSVER__" Condition="('%(Extension)' == '.vstemplate') and '$(IsOfficialBuild)' == 'false'" Replace="$(TemplatesTargetVersion)" />
+    <RegexReplace Files="@(FilesToReplace)" Find="__NUGETFEEDSOURCE__" Condition="('%(Extension)' == '.vstemplate')" Replace="$(NugetFeedSource)" />
 
-    <RegexReplace Files="@(FilesToReplace)" Find="__BrowserLinkPackageVersion__" Condition="('%(Extension)' == '.json')" Encoding="ascii" Replace="$(TemplatesTargetVersion).0-beta3" />
-    <RegexReplace Files="@(FilesToReplace)" Find="__VSVER__" Condition="('%(Extension)' == '.json')" Encoding="ascii" Replace="$(TemplatesTargetVersion)" />
+    <RegexReplace Files="@(FilesToReplace)" Find="__VSVER__" Condition="('%(Filename)%(Extension)' == 'project.json')" Encoding="ascii" Replace="$(TemplatesTargetVersion)" />
 
-    <Message Text="Running $(UpdateJsonCommand) on $(TempPath)"/>
-    <Exec WorkingDirectory="$(TempPath)" Command="$(UpdateJsonCommand) &quot;$(PackageSource)&quot;" />
+    <Message Text="Running $(UpdateJsonCommand) on $(TempPath)" Condition="'$(UseExactPackageVersions)' == 'true'"/>
+    <Exec WorkingDirectory="$(TempPath)" Command="$(UpdateJsonCommand) &quot;$(PackageSource)&quot;" Condition="'$(UseExactPackageVersions)' == 'true'"/>
 
     <Exec WorkingDirectory="$(TempPath)" Command="$(ZipCommand) $(TemplatesOutputPath)$(TargetName).zip * &gt; nul" />
     <Message Text="$(TargetName).zip" Importance="high" />
@@ -99,14 +98,33 @@
     <ItemGroup>
       <FilesToVerify Include="**\*.*"/>
       <FilesToVerify Remove="**\*.ico"/>
+      <FilesToVerify Remove="**\*.min.js"/>
+      <FilesToVerify Remove="**\*.min.css"/>
       <FilesToVerify Remove="StarterWeb\node_modules\**\*.*"/>
       <FilesToVerify Remove="StarterWeb\bower_components\**\*.*"/>
-      <FilesToVerify Remove="StarterWeb\wwwroot\lib\bootstrap*\**\*.*"/>
+      <FilesToVerify Remove="StarterWeb\wwwroot\lib\bootstrap\**\*.*"/>
       <FilesToVerify Remove="StarterWeb\wwwroot\lib\jquery*\**\*.*"/>
+      <FilesToVerify Remove="StarterWeb\wwwroot\lib\**\*.*"/>
       <FilesToVerify Remove="StarterWeb\wwwroot\images\**\*.*"/>
     </ItemGroup>
-    <Message Text="@(FilesToVerify)" Importance="high" />
     <VerifyWhitespace FileList="@(FilesToVerify)"/>
+    <ItemGroup>
+      <FilesToVerify Remove="StarterWeb\.bowerrc"/>
+      <FilesToVerify Remove="StarterWeb\bower.json"/>
+      <FilesToVerify Remove="StarterWeb\package.json"/>
+    </ItemGroup>
+    <VerifyBOM FileList="@(FilesToVerify)"/>
+    <ItemGroup>
+      <FilesToVerify Remove="@(FilesToVerify)"/>
+      <FilesToVerify Include="**\*.cs"/>
+      <FilesToVerify Remove="Common\Properties\AssemblyInfo.cs"/>
+    </ItemGroup>
+    <VerifyUsings FileList="@(FilesToVerify)" RequiredUsings="System;System.Collections.Generic;System.Linq;System.Threading.Tasks"/>
+    <ItemGroup>
+      <FilesToVerify Remove="@(FilesToVerify)"/>
+      <FilesToVerify Include="**\project.json"/>
+    </ItemGroup>
+    <VerifySortedDependencies FileList="@(FilesToVerify)"/>
   </Target>
 
   <Target Name="BuildCompiled">

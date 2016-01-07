@@ -1,32 +1,50 @@
-/// <binding Clean='clean' />
+﻿/// <binding Clean='clean' ProjectOpened='watch' />
+"use strict";
 
 var gulp = require("gulp"),
-  rimraf = require("rimraf"),
-  fs = require("fs");
+    rimraf = require("rimraf"),
+    concat = require("gulp-concat"),
+    cssmin = require("gulp-cssmin"),
+    uglify = require("gulp-uglify");
 
-eval("var project = " + fs.readFileSync("./project.json"));
+var webroot = "./wwwroot/";
 
 var paths = {
-  bower: "./bower_components/",
-  lib: "./" + project.webroot + "/lib/"
+    js: webroot + "js/**/*.js",
+    minJs: webroot + "js/**/*.min.js",
+    css: webroot + "css/**/*.css",
+    minCss: webroot + "css/**/*.min.css",
+    concatJsDest: webroot + "js/site.min.js",
+    concatCssDest: webroot + "css/site.min.css"
 };
 
-gulp.task("clean", function (cb) {
-  rimraf(paths.lib, cb);
+gulp.task("clean:js", function (cb) {
+    rimraf(paths.concatJsDest, cb);
 });
 
-gulp.task("copy", ["clean"], function () {
-  var bower = {
-    "bootstrap": "bootstrap/dist/**/*.{js,map,css,ttf,svg,woff,eot}",
-    "bootstrap-touch-carousel": "bootstrap-touch-carousel/dist/**/*.{js,css}",
-    "hammer.js": "hammer.js/hammer*.{js,map}",
-    "jquery": "jquery/jquery*.{js,map}",
-    "jquery-validation": "jquery-validation/jquery.validate.js",
-    "jquery-validation-unobtrusive": "jquery-validation-unobtrusive/jquery.validate.unobtrusive.js"
-  }
+gulp.task("clean:css", function (cb) {
+    rimraf(paths.concatCssDest, cb);
+});
 
-  for (var destinationDir in bower) {
-    gulp.src(paths.bower + bower[destinationDir])
-      .pipe(gulp.dest(paths.lib + destinationDir));
-  }
+gulp.task("clean", ["clean:js", "clean:css"]);
+
+gulp.task("min:js", function () {
+    return gulp.src([paths.js, "!" + paths.minJs], { base: "." })
+        .pipe(concat(paths.concatJsDest))
+        .pipe(uglify())
+        .pipe(gulp.dest("."));
+});
+
+gulp.task("min:css", function () {
+    return gulp.src([paths.css, "!" + paths.minCss])
+        .pipe(concat(paths.concatCssDest))
+        .pipe(cssmin())
+        .pipe(gulp.dest("."));
+});
+
+gulp.task("min", ["min:js", "min:css"]);
+
+gulp.task("watch", function () {
+    gulp.watch([paths.css, "!" + paths.minCss], ["min:css"]);
+    gulp.watch([paths.js, "!" + paths.minJs], ["min:js"]);
 });

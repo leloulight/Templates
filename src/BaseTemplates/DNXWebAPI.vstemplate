@@ -3,7 +3,7 @@
   <TemplateData>
     <Name>ASP.NET 5 Web API</Name>
     <Description>A project for creating an ASP.NET 5 Web API</Description>
-    <Icon>WebProject.png</Icon>
+    <Icon>WebAPI.png</Icon>
     <ProjectType>CSharp</ProjectType>
     <ProjectSubType>Web</ProjectSubType>
     <RequiredFrameworkVersion>4.5</RequiredFrameworkVersion>
@@ -20,10 +20,11 @@
     <ProjectCollection/>
     <CustomParameters>
       <CustomParameter Name="$projectwizardname$" Value="WebAPI\WebAPI.vstemplate" />
+      <CustomParameter Name="$nugetfeedsource$" Value="__NUGETFEEDSOURCE__" />
     </CustomParameters>
   </TemplateContent>
   <WizardExtension>
-    <Assembly>Microsoft.VisualStudio.ProjectSystem.Wizard, Version=__VSVER__.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</Assembly>
-    <FullClassName>Microsoft.VisualStudio.ProjectSystem.Wizard.FolderLayoutTemplateWizard</FullClassName>
+    <Assembly>Microsoft.VisualStudio.ProjectSystem.DotNet.Wizard, Version=__VSVER__.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</Assembly>
+    <FullClassName>Microsoft.VisualStudio.ProjectSystem.DotNet.Wizard.FolderLayoutTemplateWizard</FullClassName>
   </WizardExtension>
 </VSTemplate>

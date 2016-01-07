@@ -1,55 +1,78 @@
 ﻿<Project ToolsVersion="4.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
     <UsingTask
-        TaskName="GetDotNetFolder"
+        TaskName="VerifyJsReferences"
         TaskFactory="CodeTaskFactory"
         AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.v4.0.dll" >
         <ParameterGroup>
-            <DotNetPath ParameterType="Microsoft.Build.Framework.ITaskItem" Output="true" />
+            <WwwRootPath ParameterType="System.String" />
         </ParameterGroup>
         <Task>
             <Using Namespace="System" />
+            <Using Namespace="System.Collections.Generic" />
+            <Using Namespace="System.IO" />
+            <Using Namespace="System.Text.RegularExpressions" />
             <Using Namespace="Microsoft.Build.Framework" />
             <Using Namespace="Microsoft.Build.Utilities" />
             <Code Type="Fragment" Language="cs">
                 <![CDATA[
                 try
                 {
-                    string runtimeRoot = ".dnx";
-                    string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-                    string defaultAlias = Path.Combine(userProfile, runtimeRoot, "alias", "default.txt");
-
-                    if (!File.Exists(defaultAlias))
+                    List<string> referencePaths = new List<string>();
+                    string referencesFilename = Path.Combine(WwwRootPath, "_references.js");
+                    if (File.Exists(referencesFilename))
                     {
-                        Log.LogError("Unable to locate default alias {0}.", defaultAlias);
-                    }
-                    else 
-                    {
-                        using (var file = File.OpenText(defaultAlias))
+                        using (var referencesFile = File.OpenText(referencesFilename))
                         {
-                            string runtime = file.ReadToEnd().Trim();
-                            Log.LogMessage(@"Checking for runtime folder at {0}\{1}\runtimes\{2}\bin", userProfile, runtimeRoot, runtime);
-                            var runtimeBin = Path.Combine(userProfile, runtimeRoot, "runtimes", runtime, "bin");
-                            if (!Directory.Exists(runtimeBin))
+                            string line = referencesFile.ReadToEnd();
+                            foreach(Match match in Regex.Matches(line, "path=\"(.*)\""))
                             {
-                                Log.LogError("{0} was specified in {1}, but it was not installed.", runtimeBin, defaultAlias);
+                                var referencePath = match.Groups[1].Value;
+                                referencePaths.Add(referencePath);
+                                // verify in this direction as we grab the captures.
+
+                                if (!File.Exists(Path.Combine(WwwRootPath, referencePath)))
+                                {
+                                    Log.LogError("File specified in _references.js, but not found in project. '{0}'", referencePath);
+                                }
                             }
-                            else
+                        }
+                    }
+
+                    // verify that the *.js files in the project root are in _references.js
+                    DirectoryInfo rootFolder = new DirectoryInfo(Path.Combine(WwwRootPath, ".."));
+                    foreach (var file in rootFolder.EnumerateFiles("*.js"))
+                    {
+                        string referencePath = Path.Combine("..", file.Name).Replace(Path.DirectorySeparatorChar, '/');
+                        if (!referencePaths.Contains(referencePath))
+                        {
+                            Log.LogError("File found in project root, but not found in _references.js. '{0}'", referencePath);
+                        }
+                    }
+
+                    // verify that the *.js files in the wwwroot folder are in _references.js
+                    DirectoryInfo wwwFolder = new DirectoryInfo(WwwRootPath);
+                    foreach (var file in wwwFolder.EnumerateFiles("*.js", SearchOption.AllDirectories))
+                    {
+                        string referencePath = file.FullName.Substring(wwwFolder.FullName.Length + 1).Replace(Path.DirectorySeparatorChar, '/');
+                        if (!referencePaths.Contains(referencePath, StringComparer.OrdinalIgnoreCase) && !referencePath.Equals("_references.js", StringComparison.OrdinalIgnoreCase))
+                        {
+                            // ignore *.min.js
+                            if (!referencePath.EndsWith(".min.js", StringComparison.OrdinalIgnoreCase))
                             {
-                                runtimeBin += @"\";
-                                DotNetPath = new TaskItem(runtimeBin);
+                                Log.LogError("File found in wwwroot, but not found in _references.js. '{0}'", referencePath);
                             }
                         }
                     }
                 }
                 catch(Exception ex)
                 {
-                    Log.LogError("Error getting DotNet folder");
+                    Log.LogError("Error in VerifyJsReferences");
                     Log.LogErrorFromException(ex);
                 }
-                
+
                 return !Log.HasLoggedErrors;
                 ]]>
             </Code>
         </Task>
-    </UsingTask>    
-</Project>     
+    </UsingTask>
+</Project>
